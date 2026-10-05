@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqladmin import Admin
 from app.core.config import settings
+from app.core.database import engine
+from app.core.admin import setup_admin
 
 from app.modules.auth.router import router as auth_router
 from app.modules.categories.router import router as categories_router
@@ -16,9 +19,13 @@ app = FastAPI(
     version="1.0.0",
 )
 
+admin = Admin(app, engine, title="POS Admin Panel")
+setup_admin(admin)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
