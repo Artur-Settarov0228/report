@@ -6,6 +6,9 @@ from app.shared.enums import OrderStatus
 class OrderCreate(BaseModel):
     table_id: int | None = None
 
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
+
 class OrderItemAdd(BaseModel):
     product_id: int
     quantity: int = Field(gt=0, description="Quantity must be greater than 0")

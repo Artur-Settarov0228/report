@@ -190,6 +190,13 @@ export default function TableDetails() {
           </div>
           
           <button 
+            onClick={() => navigate('/tables')}
+            className="w-full bg-white border-2 border-primary text-primary hover:bg-orange-50 font-bold py-4 rounded-xl shadow-sm transition text-lg active:scale-[0.98] mb-3"
+          >
+            Saqlash va chiqish
+          </button>
+          
+          <button 
             onClick={() => setShowPayment(true)}
             disabled={!order || order.items.length === 0 || createOrderMutation.isPending || addItemMutation.isPending}
             className="w-full bg-primary hover:bg-orange-700 text-white font-bold py-4 rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed text-lg active:scale-[0.98]"

@@ -5,3 +5,8 @@ export const createPayment = async (order_id: number, amount: number, method: st
   const response = await apiClient.post<Payment>('/api/v1/payments', { order_id, amount, method });
   return response.data;
 };
+
+export const getAllPayments = async (): Promise<Payment[]> => {
+  const response = await apiClient.get<Payment[]>('/api/v1/payments');
+  return response.data;
+};

@@ -21,13 +21,15 @@ class OrderRepository:
         )
         return result.scalars().first()
 
-    async def get_all(self, restaurant_id: int, skip: int = 0, limit: int = 50) -> Sequence[Order]:
+    async def get_all(self, restaurant_id: int, table_id: int | None = None, status: str | None = None, skip: int = 0, limit: int = 1000) -> Sequence[Order]:
+        query = select(Order).options(selectinload(Order.items)).where(Order.restaurant_id == restaurant_id)
+        if table_id is not None:
+            query = query.where(Order.table_id == table_id)
+        if status is not None:
+            query = query.where(Order.status == status)
+            
         result = await self.db.execute(
-            select(Order)
-            .options(selectinload(Order.items))
-            .where(Order.restaurant_id == restaurant_id)
-            .order_by(Order.id.desc())
-            .offset(skip).limit(limit)
+            query.order_by(Order.id.desc()).offset(skip).limit(limit)
         )
         return result.scalars().all()
 
@@ -90,3 +92,7 @@ class OrderRepository:
         )
         await self.db.flush()
         return total
+
+    async def update_status(self, order_id: int, status: str) -> None:
+        await self.db.execute(update(Order).where(Order.id == order_id).values(status=status))
+        await self.db.flush()

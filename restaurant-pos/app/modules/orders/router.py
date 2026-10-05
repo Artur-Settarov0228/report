@@ -5,7 +5,7 @@ from typing import List
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.modules.users.models import User
-from app.modules.orders.schemas import OrderCreate, OrderItemAdd, OrderItemUpdate, OrderResponse
+from app.modules.orders.schemas import OrderCreate, OrderItemAdd, OrderItemUpdate, OrderResponse, OrderStatusUpdate
 from app.modules.orders.service import OrderService
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
@@ -21,15 +21,19 @@ async def create_order(
     await db.commit()
     return order
 
+from app.shared.enums import OrderStatus
+
 @router.get("", response_model=List[OrderResponse])
 async def get_orders(
+    table_id: int | None = Query(None),
+    status: OrderStatus | None = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(1000, ge=1),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     service = OrderService(db)
-    return await service.get_orders(current_user.restaurant_id, skip, limit)
+    return await service.get_orders(current_user.restaurant_id, table_id, status, skip, limit)
 
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
@@ -74,5 +78,17 @@ async def remove_order_item(
 ):
     service = OrderService(db)
     order = await service.remove_item(order_id, item_id, current_user.restaurant_id)
+    await db.commit()
+    return order
+
+@router.patch("/{order_id}/status", response_model=OrderResponse)
+async def update_order_status(
+    order_id: int,
+    status_in: OrderStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    service = OrderService(db)
+    order = await service.update_status(order_id, status_in.status, current_user.restaurant_id)
     await db.commit()
     return order

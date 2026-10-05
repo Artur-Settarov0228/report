@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
 import datetime
+from typing import Sequence
 
 from app.modules.payments.schemas import PaymentCreate
 from app.modules.payments.models import Payment
@@ -38,7 +39,7 @@ class PaymentService:
             )
             
         # 4. Check amount match (For MVP we don't allow partial payments yet)
-        if payment_in.amount != order.total_amount:
+        if abs(payment_in.amount - order.total_amount) > 1:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Payment amount ({payment_in.amount}) does not match order total ({order.total_amount})"
@@ -50,9 +51,13 @@ class PaymentService:
         # 6. Mark order as PAID/COMPLETED
         await self.db.execute(
             update(Order).where(Order.id == order.id).values(
-                status=OrderStatus.PAID,
+                status=OrderStatus.COMPLETED,
                 completed_at=datetime.datetime.utcnow()
             )
         )
-        
+
+
         return payment
+
+    async def get_payments(self, restaurant_id: int, skip: int = 0, limit: int = 1000) -> Sequence[Payment]:
+        return await self.repo.get_all(restaurant_id, skip, limit)

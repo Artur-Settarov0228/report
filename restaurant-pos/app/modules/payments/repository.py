@@ -40,3 +40,13 @@ class PaymentRepository:
         await self.db.flush()
         await self.db.refresh(payment)
         return payment
+
+    async def get_all(self, restaurant_id: int, skip: int = 0, limit: int = 1000) -> Sequence[Payment]:
+        from app.modules.orders.models import Order
+        result = await self.db.execute(
+            select(Payment).join(Order, Payment.order_id == Order.id)
+            .where(Order.restaurant_id == restaurant_id)
+            .order_by(Payment.id.desc())
+            .offset(skip).limit(limit)
+        )
+        return result.scalars().all()

@@ -25,8 +25,8 @@ class OrderService:
                 
         return await self.repo.create(order_in, restaurant_id, cashier_id)
 
-    async def get_orders(self, restaurant_id: int, skip: int = 0, limit: int = 50) -> Sequence[Order]:
-        return await self.repo.get_all(restaurant_id, skip, limit)
+    async def get_orders(self, restaurant_id: int, table_id: int | None = None, status: str | None = None, skip: int = 0, limit: int = 1000) -> Sequence[Order]:
+        return await self.repo.get_all(restaurant_id, table_id, status, skip, limit)
 
     async def get_order(self, order_id: int, restaurant_id: int) -> Order:
         order = await self.repo.get_by_id(order_id, restaurant_id)
@@ -87,4 +87,9 @@ class OrderService:
             
         await self.repo.delete_item(item)
         await self.repo.recalculate_total(order.id)
+        return await self.get_order(order.id, restaurant_id)
+
+    async def update_status(self, order_id: int, status: str, restaurant_id: int) -> Order:
+        order = await self.get_order(order_id, restaurant_id)
+        await self.repo.update_status(order.id, status)
         return await self.get_order(order.id, restaurant_id)

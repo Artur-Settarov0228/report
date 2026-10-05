@@ -19,3 +19,16 @@ async def create_payment(
     payment = await service.process_payment(payment_in, current_user.restaurant_id, current_user.id)
     await db.commit()
     return payment
+
+from typing import List
+from fastapi import Query
+
+@router.get("", response_model=List[PaymentResponse])
+async def get_payments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    service = PaymentService(db)
+    return await service.get_payments(current_user.restaurant_id, skip, limit)

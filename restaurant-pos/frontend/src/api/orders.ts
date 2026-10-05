@@ -25,3 +25,13 @@ export const removeOrderItem = async (order_id: number, item_id: number): Promis
   const response = await apiClient.delete<Order>(`/api/v1/orders/${order_id}/items/${item_id}`);
   return response.data;
 };
+
+export const getAllOrders = async (): Promise<Order[]> => {
+  const response = await apiClient.get<Order[]>('/api/v1/orders', { params: { limit: 1000 } });
+  return response.data;
+};
+
+export const updateOrderStatus = async (order_id: number, status: "OPEN" | "COMPLETED" | "CANCELLED"): Promise<Order> => {
+  const response = await apiClient.patch<Order>(`/api/v1/orders/${order_id}/status`, { status });
+  return response.data;
+};
