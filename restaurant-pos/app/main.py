@@ -5,6 +5,16 @@ from app.core.config import settings
 from app.core.database import engine
 from app.core.admin import setup_admin
 
+# Ensure all models are imported so SQLAlchemy registry can resolve string references
+from app.modules.restaurants.models import Restaurant
+from app.modules.users.models import User
+from app.modules.categories.models import Category
+from app.modules.products.models import Product
+from app.modules.tables.models import Table
+from app.modules.orders.models import Order, OrderItem
+from app.modules.payments.models import Payment
+
+
 from app.modules.auth.router import router as auth_router
 from app.modules.categories.router import router as categories_router
 from app.modules.products.router import router as products_router
@@ -25,7 +35,8 @@ setup_admin(admin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "ishla"],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

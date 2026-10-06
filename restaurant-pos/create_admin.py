@@ -1,7 +1,14 @@
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+
 from app.modules.restaurants.models import Restaurant
 from app.modules.users.models import User
+from app.modules.categories.models import Category
+from app.modules.products.models import Product
+from app.modules.tables.models import Table
+from app.modules.orders.models import Order, OrderItem
+from app.modules.payments.models import Payment
+
 from app.core.security import get_password_hash
 from app.core.config import settings
 

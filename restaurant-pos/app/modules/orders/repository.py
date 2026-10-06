@@ -91,6 +91,12 @@ class OrderRepository:
             update(Order).where(Order.id == order_id).values(total_amount=total)
         )
         await self.db.flush()
+        
+        # Expire the order so it re-fetches with updated total_amount
+        order_obj = await self.db.get(Order, order_id)
+        if order_obj:
+            await self.db.refresh(order_obj, ['total_amount'])
+            
         return total
 
     async def update_status(self, order_id: int, status: str) -> None:

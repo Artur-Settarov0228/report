@@ -49,18 +49,23 @@ class OrderService:
         if not product or not product.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product not found or inactive")
 
-        # Snapshot pricing
-        subtotal = product.price * item_in.quantity
+        # Check if product already exists in order
+        existing_item = next((item for item in order.items if item.product_id == product.id), None)
         
-        await self.repo.add_item(
-            order_id=order.id,
-            product_id=product.id,
-            product_name=product.name,
-            unit_price=product.price,
-            quantity=item_in.quantity,
-            subtotal=subtotal,
-            note=item_in.note
-        )
+        if existing_item:
+            new_quantity = existing_item.quantity + item_in.quantity
+            await self.repo.update_item(existing_item, new_quantity, existing_item.note)
+        else:
+            subtotal = product.price * item_in.quantity
+            await self.repo.add_item(
+                order_id=order.id,
+                product_id=product.id,
+                product_name=product.name,
+                unit_price=product.price,
+                quantity=item_in.quantity,
+                subtotal=subtotal,
+                note=item_in.note
+            )
         
         await self.repo.recalculate_total(order.id)
         return await self.get_order(order.id, restaurant_id)

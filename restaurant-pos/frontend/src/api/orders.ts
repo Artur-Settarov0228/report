@@ -26,8 +26,8 @@ export const removeOrderItem = async (order_id: number, item_id: number): Promis
   return response.data;
 };
 
-export const getAllOrders = async (): Promise<Order[]> => {
-  const response = await apiClient.get<Order[]>('/api/v1/orders', { params: { limit: 1000 } });
+export const getAllOrders = async (params?: { status?: string; limit?: number }): Promise<Order[]> => {
+  const response = await apiClient.get<Order[]>('/api/v1/orders', { params: { limit: 1000, ...params } });
   return response.data;
 };
 

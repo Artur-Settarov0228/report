@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCategories } from '../api/categories';
 import { getProducts } from '../api/products';
-import { getOrderByTable, createOrder, addOrderItem, removeOrderItem, updateOrderItem } from '../api/orders';
+import { getOrderByTable, createOrder, addOrderItem, removeOrderItem, updateOrderItem, updateOrderStatus } from '../api/orders';
 import { createPayment } from '../api/payments';
 import { Trash2, ArrowLeft, CreditCard, CheckCircle } from 'lucide-react';
+import { Order, Product } from '../types';
 
 export default function TableDetails() {
   const { id } = useParams<{ id: string }>();
@@ -44,19 +45,101 @@ export default function TableDetails() {
   const addItemMutation = useMutation({
     mutationFn: ({ orderId, productId }: { orderId: number, productId: number }) => 
       addOrderItem(orderId, productId, 1),
-    onSuccess: (data) => queryClient.setQueryData(['order', tableId], data)
+    onMutate: async ({ productId }) => {
+      await queryClient.cancelQueries({ queryKey: ['order', tableId] });
+      const previousOrder = queryClient.getQueryData<Order>(['order', tableId]);
+      
+      if (previousOrder) {
+        const product = products?.find((p: Product) => p.id === productId);
+        if (!product) return { previousOrder };
+
+        const newOrder = { ...previousOrder, items: [...previousOrder.items] };
+        const existingItemIndex = newOrder.items.findIndex(i => i.product_id === productId);
+        
+        if (existingItemIndex >= 0) {
+          const item = { ...newOrder.items[existingItemIndex] };
+          item.quantity += 1;
+          item.subtotal = Number(item.quantity) * Number(item.unit_price);
+          newOrder.items[existingItemIndex] = item;
+        } else {
+          newOrder.items.push({
+            id: Date.now(),
+            order_id: previousOrder.id,
+            product_id: productId,
+            product_name: product.name,
+            quantity: 1,
+            unit_price: product.price,
+            subtotal: product.price
+          });
+        }
+        
+        queryClient.setQueryData(['order', tableId], newOrder);
+      }
+      return { previousOrder };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.previousOrder) {
+        queryClient.setQueryData(['order', tableId], context.previousOrder);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', tableId] });
+    }
   });
 
   const updateItemMutation = useMutation({
     mutationFn: ({ orderId, itemId, quantity }: { orderId: number, itemId: number, quantity: number }) => 
       updateOrderItem(orderId, itemId, quantity),
-    onSuccess: (data) => queryClient.setQueryData(['order', tableId], data)
+    onMutate: async ({ itemId, quantity }) => {
+      await queryClient.cancelQueries({ queryKey: ['order', tableId] });
+      const previousOrder = queryClient.getQueryData<Order>(['order', tableId]);
+      
+      if (previousOrder) {
+        const newOrder = { ...previousOrder, items: previousOrder.items.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              quantity,
+              subtotal: quantity * Number(item.unit_price)
+            };
+          }
+          return item;
+        }) };
+        queryClient.setQueryData(['order', tableId], newOrder);
+      }
+      return { previousOrder };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.previousOrder) {
+        queryClient.setQueryData(['order', tableId], context.previousOrder);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', tableId] });
+    }
   });
 
   const removeItemMutation = useMutation({
     mutationFn: ({ orderId, itemId }: { orderId: number, itemId: number }) => 
       removeOrderItem(orderId, itemId),
-    onSuccess: (data) => queryClient.setQueryData(['order', tableId], data)
+    onMutate: async ({ itemId }) => {
+      await queryClient.cancelQueries({ queryKey: ['order', tableId] });
+      const previousOrder = queryClient.getQueryData<Order>(['order', tableId]);
+      
+      if (previousOrder) {
+        const newOrder = { ...previousOrder, items: previousOrder.items.filter(i => i.id !== itemId) };
+        queryClient.setQueryData(['order', tableId], newOrder);
+      }
+      return { previousOrder };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.previousOrder) {
+        queryClient.setQueryData(['order', tableId], context.previousOrder);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', tableId] });
+    }
   });
 
   const paymentMutation = useMutation({
@@ -69,8 +152,18 @@ export default function TableDetails() {
     }
   });
 
+  const cancelOrderMutation = useMutation({
+    mutationFn: () => updateOrderStatus(order!.id, "CANCELLED"),
+    onSuccess: () => {
+      queryClient.setQueryData(['order', tableId], null);
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      navigate('/tables');
+    }
+  });
+
   const handleAddProduct = (productId: number) => {
     if (!order) {
+      if (createOrderMutation.isPending) return;
       createOrderMutation.mutate(undefined, {
         onSuccess: (newOrder) => addItemMutation.mutate({ orderId: newOrder.id, productId })
       });
@@ -126,7 +219,7 @@ export default function TableDetails() {
                   )}
                 </div>
                 <h3 className="font-semibold text-gray-900 leading-tight mb-1">{p.name}</h3>
-                <p className="text-primary font-bold">{p.price.toLocaleString()} so'm</p>
+                <p className="text-primary font-bold">{Number(p.price).toLocaleString('ru-RU')} so'm</p>
               </div>
             ))}
           </div>
@@ -151,7 +244,7 @@ export default function TableDetails() {
               <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="font-medium text-gray-900 truncate">{item.product_name}</h4>
-                  <p className="text-sm text-gray-500">{item.unit_price.toLocaleString()} so'm</p>
+                  <p className="text-sm text-gray-500">{Number(item.unit_price).toLocaleString('ru-RU')} so'm</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5 bg-white rounded-md border border-gray-200 p-1">
@@ -167,7 +260,7 @@ export default function TableDetails() {
                       className="w-7 h-7 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50 font-bold"
                     >+</button>
                   </div>
-                  <p className="font-bold text-gray-900 w-24 text-right text-lg">{item.subtotal.toLocaleString()}</p>
+                  <p className="font-bold text-gray-900 w-24 text-right text-lg">{Number(item.subtotal).toLocaleString('ru-RU')}</p>
                   <button 
                     onClick={() => removeItemMutation.mutate({ orderId: order.id, itemId: item.id })}
                     disabled={removeItemMutation.isPending}
@@ -185,16 +278,29 @@ export default function TableDetails() {
           <div className="flex justify-between items-center mb-6">
             <span className="text-lg font-medium text-gray-600">Jami summasi</span>
             <span className="text-2xl font-bold text-gray-900">
-              {order?.total_amount ? order.total_amount.toLocaleString() : 0} <span className="text-sm text-gray-500 font-normal">so'm</span>
+              {order?.items ? order.items.reduce((sum, item) => sum + Number(item.subtotal), 0).toLocaleString('ru-RU') : 0} <span className="text-sm text-gray-500 font-normal">so'm</span>
             </span>
           </div>
           
-          <button 
-            onClick={() => navigate('/tables')}
-            className="w-full bg-white border-2 border-primary text-primary hover:bg-orange-50 font-bold py-4 rounded-xl shadow-sm transition text-lg active:scale-[0.98] mb-3"
-          >
-            Saqlash va chiqish
-          </button>
+          <div className="flex gap-2 mb-3">
+            <button 
+              onClick={() => navigate('/tables')}
+              className="flex-1 bg-white border-2 border-primary text-primary hover:bg-orange-50 font-bold py-4 rounded-xl shadow-sm transition text-lg active:scale-[0.98]"
+            >
+              Saqlash
+            </button>
+            <button 
+              onClick={() => {
+                if (window.confirm("Buyurtmani bekor qilishni xohlaysizmi?")) {
+                  cancelOrderMutation.mutate();
+                }
+              }}
+              disabled={!order || cancelOrderMutation.isPending}
+              className="flex-1 bg-white border-2 border-red-500 text-red-500 hover:bg-red-50 font-bold py-4 rounded-xl shadow-sm transition text-lg active:scale-[0.98] disabled:opacity-50"
+            >
+              Bekor qilish
+            </button>
+          </div>
           
           <button 
             onClick={() => setShowPayment(true)}
@@ -218,7 +324,7 @@ export default function TableDetails() {
             <div className="p-8">
               <div className="text-center mb-8">
                 <p className="text-sm text-gray-500 mb-1">To'lanadigan summa</p>
-                <p className="text-4xl font-bold text-gray-900">{order.total_amount.toLocaleString()} <span className="text-lg text-gray-500">so'm</span></p>
+                <p className="text-4xl font-bold text-gray-900">{order?.items ? order.items.reduce((sum, item) => sum + Number(item.subtotal), 0).toLocaleString('ru-RU') : 0} <span className="text-lg text-gray-500">so'm</span></p>
               </div>
 
               <p className="font-medium text-gray-700 mb-3">To'lov usuli</p>
